@@ -8,8 +8,10 @@ import {
 } from "@/lib/tibiaVocations";
 import ItemIcon from "@/components/ItemIcon";
 import Panel from "@/components/Panel";
+import NavTabs from "@/components/NavTabs";
 
 const STORAGE_KEY = "tibia-timer-state-v4";
+const WARN_1MIN_MS = 60 * 1000;
 const WARN_MS = 30 * 1000;
 const POTION_DURATION_MS = 10 * 60 * 1000;
 const MAX_ADJUSTABLE_MS = 30 * 60 * 1000;
@@ -186,11 +188,11 @@ export default function TibiaTimer() {
   });
   const [now, setNow] = useState(() => Date.now());
   const [hydrated, setHydrated] = useState(false);
-  const warnedRef = useRef<Record<TimerId, boolean>>({
-    potion: false,
-    amulet: false,
-    ring: false,
-    free: false,
+  const warnedRef = useRef<Record<TimerId, { min1: boolean; sec30: boolean }>>({
+    potion: { min1: false, sec30: false },
+    amulet: { min1: false, sec30: false },
+    ring: { min1: false, sec30: false },
+    free: { min1: false, sec30: false },
   });
 
   const hydrateFromClient = useCallback(() => {
@@ -331,14 +333,30 @@ export default function TibiaTimer() {
           if (remaining <= 0) {
             changed = true;
             notify(`⏰ Tibia — ${cfg.label}`, `Hora de usar: ${itemName(cfg.id)}`);
-            next[cfg.id] = { running: true, endsAt: current + durationFor(cfg.id) };
-            warnedRef.current[cfg.id] = false;
+            // amuleto e anel sempre voltam para o padrão de 30:00 ao reiniciar
+            // automaticamente, mesmo que uma duração customizada tenha sido usada
+            let nextDuration = durationFor(cfg.id);
+            if (cfg.id === "amulet" && amuletDurationMs !== MAX_ADJUSTABLE_MS) {
+              setAmuletDurationMs(MAX_ADJUSTABLE_MS);
+              nextDuration = MAX_ADJUSTABLE_MS;
+            } else if (cfg.id === "ring" && ringDurationMs !== MAX_ADJUSTABLE_MS) {
+              setRingDurationMs(MAX_ADJUSTABLE_MS);
+              nextDuration = MAX_ADJUSTABLE_MS;
+            }
+            next[cfg.id] = { running: true, endsAt: current + nextDuration };
+            warnedRef.current[cfg.id] = { min1: false, sec30: false };
             continue;
           }
 
-          if (voiceOn && remaining <= WARN_MS && !warnedRef.current[cfg.id]) {
-            warnedRef.current[cfg.id] = true;
-            speak(`Está acabando ${itemName(cfg.id)} em 30 segundos`);
+          if (remaining <= WARN_1MIN_MS && !warnedRef.current[cfg.id].min1) {
+            warnedRef.current[cfg.id].min1 = true;
+            if (voiceOn) speak(`Está acabando ${itemName(cfg.id)} em 1 minuto`);
+          }
+
+          if (remaining <= WARN_MS && !warnedRef.current[cfg.id].sec30) {
+            warnedRef.current[cfg.id].sec30 = true;
+            if (voiceOn) speak(`Está acabando ${itemName(cfg.id)} em 30 segundos`);
+            if (soundOn) playBeep();
           }
         }
         return changed ? next : prev;
@@ -346,7 +364,7 @@ export default function TibiaTimer() {
     }, 250);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- durationFor lê amulet/ring/freeDurationMs, listados abaixo
-  }, [itemName, notify, voiceOn, amuletDurationMs, ringDurationMs, freeDurationMs]);
+  }, [itemName, notify, voiceOn, soundOn, amuletDurationMs, ringDurationMs, freeDurationMs]);
 
   function requestNotifPermission() {
     if (typeof Notification === "undefined") return;
@@ -354,7 +372,7 @@ export default function TibiaTimer() {
   }
 
   function startTimer(id: TimerId) {
-    warnedRef.current[id] = false;
+    warnedRef.current[id] = { min1: false, sec30: false };
     setTimers((prev) => ({
       ...prev,
       [id]: { running: true, endsAt: Date.now() + durationFor(id) },
@@ -378,7 +396,7 @@ export default function TibiaTimer() {
         if (anyRunning) {
           next[cfg.id] = { running: false, endsAt: null };
         } else {
-          warnedRef.current[cfg.id] = false;
+          warnedRef.current[cfg.id] = { min1: false, sec30: false };
           next[cfg.id] = { running: true, endsAt: current + durationFor(cfg.id) };
         }
       }
@@ -436,6 +454,7 @@ export default function TibiaTimer() {
   return (
     <div className={`min-h-screen transition-colors ${bg}`}>
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-3 py-4 sm:px-6 sm:py-8">
+        <NavTabs dark={darkMode} />
         <header className={`mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-dashed pb-4 ${subtleBorder}`}>
           <div>
             <h1
@@ -707,11 +726,14 @@ export default function TibiaTimer() {
         </div>
 
         <p className={`mt-6 text-xs ${mutedText}`}>
-          Ao zerar, cada cronômetro avisa (som + narração + notificação) e reinicia
-          sozinho, repetindo automaticamente até você pausar. Poção fixa em 10 min por
-          vocação; amuleto e anel já vêm com o item correto (Plasma) e sua duração pode
-          ser ajustada manualmente. O Timer Livre, no fim da lista, é 100% livre — dê um
-          nome e o tempo que quiser. Referência: tibiawiki.com.br / tibia.fandom.com.
+          O narrador avisa em 1 minuto e em 30 segundos; no fim dos 30 segundos e ao
+          zerar, também toca um apito. Ao zerar, cada cronômetro reinicia sozinho e
+          repete automaticamente até você pausar — amuleto e anel sempre voltam para
+          30:00 nesse reinício automático, mesmo que você tenha ajustado outro valor
+          antes. Poção fixa em 10 min por vocação; amuleto e anel já vêm com o item
+          correto (Plasma) e sua duração pode ser ajustada manualmente. O Timer Livre,
+          no fim da lista, é 100% livre — dê um nome e o tempo que quiser. Referência:
+          tibiawiki.com.br / tibia.fandom.com.
         </p>
       </div>
     </div>
