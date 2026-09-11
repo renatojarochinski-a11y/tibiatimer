@@ -6,19 +6,22 @@ Cronômetro de poções, anéis e amuletos do Tibia, por vocação.
 
 - Seleção de vocação: **EK** (Elite Knight), **ED** (Elder Druid), **MS**
   (Master Sorcerer), **RP** (Royal Paladin) e **MK** (Monk).
-- Três cronômetros, cada um com a imagem do item correto pra vocação
-  selecionada:
-  - **Poção de buff** — fixa por vocação, 10 em 10 minutos (Berserk,
-    Bullseye, Mastermind ou Transcendence Potion).
-  - **Amuleto** — Collar of [Red/Blue/Green/Orange] Plasma, 30 em 30
-    minutos (nome pode ser ajustado manualmente).
-  - **Anel** — Ring of [Red/Blue/Green/Orange] Plasma, 30 em 30 minutos
-    (nome pode ser ajustado manualmente).
+- Quatro cronômetros, em painéis com a cara do HUD do Tibia (barra de
+  título escura, bordas finas, botão de recolher):
+  - **Poção de buff** — fixa por vocação, 10 min (Berserk, Bullseye,
+    Mastermind ou Transcendence Potion), com a imagem do item.
+  - **Amuleto** — Collar of [Red/Blue/Green/Orange] Plasma, com imagem,
+    nome editável e duração ajustável manualmente entre 00:00 e 30:00.
+  - **Anel** — Ring of [Red/Blue/Green/Orange] Plasma, mesma lógica do
+    amuleto.
+  - **Timer Livre** — objetivo (nome) e duração totalmente livres, pra
+    qualquer outra coisa que você queira cronometrar.
 - Avisa com som, **narração por voz** (nos últimos 30 segundos) e
   notificação do navegador, e reinicia sozinho até você pausar.
 - **Atalho de teclado** configurável para iniciar/pausar todos os
   cronômetros de uma vez.
-- **Modo escuro** com visual inspirado no Tibia (padrão).
+- **Modo escuro** (padrão), com visual inspirado nos painéis laterais do
+  HUD do Tibia.
 - Não precisa de login nem banco de dados — tudo roda no navegador
   (localStorage guarda suas preferências).
 
