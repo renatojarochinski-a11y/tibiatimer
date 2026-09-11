@@ -76,6 +76,7 @@ interface PersistedState {
   freeDurationMs: number;
   soundOn: boolean;
   voiceOn: boolean;
+  voiceURI: string | null;
   darkMode: boolean;
   hotkeyCode: string | null;
   hotkeyLabel: string | null;
@@ -91,10 +92,30 @@ const DEFAULT_STATE: PersistedState = {
   freeDurationMs: FREE_DEFAULT_MS,
   soundOn: true,
   voiceOn: true,
+  voiceURI: null,
   darkMode: true,
   hotkeyCode: null,
   hotkeyLabel: null,
 };
+
+/**
+ * Escolhe a melhor voz em português disponível no navegador: prioriza
+ * vozes "em nuvem" (localService === false, ex.: as vozes do Google no
+ * Chrome ou as vozes "Online (Natural)" da Microsoft no Edge), que soam
+ * bem melhor que a voz local do sistema — e são de graça, sem precisar
+ * de nenhum serviço externo.
+ */
+function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (voices.length === 0) return null;
+  const pt = voices.filter((v) => v.lang.toLowerCase().startsWith("pt"));
+  const pool = pt.length > 0 ? pt : voices;
+  const ptBr = pool.filter((v) => v.lang.toLowerCase().includes("br"));
+  const preferred = ptBr.length > 0 ? ptBr : pool;
+  const cloud = preferred.filter((v) => v.localService === false);
+  const candidates = cloud.length > 0 ? cloud : preferred;
+  const premium = candidates.find((v) => /google|natural|online|neural/i.test(v.name));
+  return premium ?? candidates[0] ?? null;
+}
 
 function loadPersisted(): PersistedState {
   if (typeof window === "undefined") return DEFAULT_STATE;
@@ -144,12 +165,13 @@ function playBeep() {
   }
 }
 
-function speak(text: string) {
+function speak(text: string, voice: SpeechSynthesisVoice | null) {
   try {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "pt-BR";
+    utterance.lang = voice?.lang || "pt-BR";
+    utterance.voice = voice;
     utterance.rate = 1;
     window.speechSynthesis.speak(utterance);
   } catch {
@@ -178,6 +200,8 @@ export default function TibiaTimer() {
   const [hotkeyCode, setHotkeyCode] = useState<string | null>(DEFAULT_STATE.hotkeyCode);
   const [hotkeyLabel, setHotkeyLabel] = useState<string | null>(DEFAULT_STATE.hotkeyLabel);
   const [listeningHotkey, setListeningHotkey] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string | null>(DEFAULT_STATE.voiceURI);
   const [notifPermission, setNotifPermission] =
     useState<NotificationPermission | "unsupported">("default");
   const [timers, setTimers] = useState<Record<TimerId, TimerState>>({
@@ -206,6 +230,7 @@ export default function TibiaTimer() {
     setFreeDurationMs(persisted.freeDurationMs);
     setSoundOn(persisted.soundOn);
     setVoiceOn(persisted.voiceOn);
+    setVoiceURI(persisted.voiceURI);
     setDarkMode(persisted.darkMode);
     setHotkeyCode(persisted.hotkeyCode);
     setHotkeyLabel(persisted.hotkeyLabel);
@@ -232,6 +257,7 @@ export default function TibiaTimer() {
       freeDurationMs,
       soundOn,
       voiceOn,
+      voiceURI,
       darkMode,
       hotkeyCode,
       hotkeyLabel,
@@ -247,11 +273,35 @@ export default function TibiaTimer() {
     freeDurationMs,
     soundOn,
     voiceOn,
+    voiceURI,
     darkMode,
     hotkeyCode,
     hotkeyLabel,
     hydrated,
   ]);
+
+  // carrega as vozes disponíveis no navegador (a lista chega de forma assíncrona)
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    function loadVoices() {
+      const list = window.speechSynthesis.getVoices();
+      setVoices(list);
+    }
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, []);
+
+  // se não houver voz escolhida manualmente, define automaticamente a melhor disponível
+  useEffect(() => {
+    if (!hydrated || voiceURI || voices.length === 0) return;
+    const best = pickBestVoice(voices);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza com a lista de vozes do navegador (sistema externo)
+    if (best) setVoiceURI(best.voiceURI);
+  }, [hydrated, voiceURI, voices]);
+
+  const selectedVoice =
+    voices.find((v) => v.voiceURI === voiceURI) ?? pickBestVoice(voices);
 
   function durationFor(id: TimerId): number {
     if (id === "potion") return POTION_DURATION_MS;
@@ -350,12 +400,12 @@ export default function TibiaTimer() {
 
           if (remaining <= WARN_1MIN_MS && !warnedRef.current[cfg.id].min1) {
             warnedRef.current[cfg.id].min1 = true;
-            if (voiceOn) speak(`Está acabando ${itemName(cfg.id)} em 1 minuto`);
+            if (voiceOn) speak(`Está acabando ${itemName(cfg.id)} em 1 minuto`, selectedVoice);
           }
 
           if (remaining <= WARN_MS && !warnedRef.current[cfg.id].sec30) {
             warnedRef.current[cfg.id].sec30 = true;
-            if (voiceOn) speak(`Está acabando ${itemName(cfg.id)} em 30 segundos`);
+            if (voiceOn) speak(`Está acabando ${itemName(cfg.id)} em 30 segundos`, selectedVoice);
             if (soundOn) playBeep();
           }
         }
@@ -364,7 +414,16 @@ export default function TibiaTimer() {
     }, 250);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- durationFor lê amulet/ring/freeDurationMs, listados abaixo
-  }, [itemName, notify, voiceOn, soundOn, amuletDurationMs, ringDurationMs, freeDurationMs]);
+  }, [
+    itemName,
+    notify,
+    voiceOn,
+    soundOn,
+    selectedVoice,
+    amuletDurationMs,
+    ringDurationMs,
+    freeDurationMs,
+  ]);
 
   function requestNotifPermission() {
     if (typeof Notification === "undefined") return;
@@ -437,17 +496,19 @@ export default function TibiaTimer() {
   const vocationInfo = VOCATIONS[vocation];
   const anyRunning = TIMERS.some((cfg) => timers[cfg.id].running);
 
-  const bg = darkMode ? "bg-[#131210] text-[#d8d2b8]" : "bg-neutral-50 text-neutral-800";
+  const bg = darkMode
+    ? "bg-[#0b0a09] text-[#d8d2b8]"
+    : "bg-neutral-50 text-neutral-800";
   const mutedText = darkMode ? "text-[#a89f82]" : "text-neutral-500";
   const subtleBorder = darkMode ? "border-black" : "border-neutral-200";
   const inputCls = darkMode
-    ? "border-black/60 bg-[#1a1a17] text-[#e3ddc4] placeholder:text-[#75705c] focus:border-[#c9a227]"
+    ? "border-black/60 bg-[#1a1a17] text-[#e3ddc4] placeholder:text-[#75705c] focus:border-[#e2711d]"
     : "border-neutral-200 bg-white text-neutral-700 focus:border-rose-400";
   const btnGhost = darkMode
     ? "border-black/60 bg-[#333029] text-[#d8d2b8] hover:bg-[#3d3a30]"
     : "border-neutral-200 text-neutral-600 hover:bg-neutral-50";
   const btnPrimary = darkMode
-    ? "bg-[#5a1f1f] text-[#f3e3c0] hover:bg-[#6d2626]"
+    ? "bg-gradient-to-b from-[#f0932b] to-[#c9631a] text-[#20120a] hover:from-[#f7a13e] hover:to-[#d4701f] font-semibold"
     : "bg-rose-500 text-white hover:bg-rose-600";
   const btnToggleOn = "bg-emerald-700 text-white border-emerald-700";
 
@@ -455,15 +516,20 @@ export default function TibiaTimer() {
     <div className={`min-h-screen transition-colors ${bg}`}>
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-3 py-4 sm:px-6 sm:py-8">
         <NavTabs dark={darkMode} />
-        <header className={`mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-dashed pb-4 ${subtleBorder}`}>
+        <header
+          className={`relative mb-5 flex flex-wrap items-center justify-between gap-3 pb-4 ${subtleBorder}`}
+        >
+          {darkMode && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#e2711d] to-transparent" />
+          )}
           <div>
             <h1
-              className={`text-xl font-bold uppercase tracking-widest sm:text-2xl ${
-                darkMode ? "text-[#e3c168]" : "text-neutral-800"
+              className={`font-display text-2xl font-bold uppercase tracking-[0.15em] sm:text-3xl ${
+                darkMode ? "text-[#f0932b]" : "text-neutral-800"
               }`}
-              style={darkMode ? { textShadow: "0 0 12px rgba(227,193,104,0.35)" } : undefined}
+              style={darkMode ? { textShadow: "0 0 18px rgba(240,147,43,0.45)" } : undefined}
             >
-              ⚔️ Tibia Timer
+              Tibia Timer
             </h1>
             <p className={`text-sm ${mutedText}`}>
               Poção a cada 10 min · Amuleto e anel a cada 30 min · timer livre à sua escolha
@@ -509,7 +575,7 @@ export default function TibiaTimer() {
                     className={`rounded-[3px] border px-2.5 py-1.5 text-xs font-medium transition ${
                       active
                         ? darkMode
-                          ? "border-[#c9a227] bg-[#c9a227] text-[#1c140c]"
+                          ? "border-[#e2711d] bg-[#e2711d] text-[#20120a]"
                           : "border-rose-500 bg-rose-500 text-white"
                         : btnGhost
                     }`}
@@ -548,7 +614,7 @@ export default function TibiaTimer() {
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-xs ${mutedText}`}>🗣️ Narrador (30s)</span>
+                <span className={`text-xs ${mutedText}`}>🗣️ Narrador (1min/30s)</span>
                 <button
                   onClick={() => setVoiceOn((v) => !v)}
                   className={`rounded-[2px] border px-2 py-0.5 text-[11px] font-semibold ${
@@ -557,6 +623,28 @@ export default function TibiaTimer() {
                 >
                   {voiceOn ? "Ligado" : "Desligado"}
                 </button>
+                {voiceOn && voices.length > 0 && (
+                  <select
+                    value={voiceURI ?? ""}
+                    onChange={(e) => setVoiceURI(e.target.value || null)}
+                    className={`rounded-[2px] border px-1.5 py-0.5 text-[11px] focus:outline-none ${inputCls}`}
+                    title="Voz do narrador"
+                  >
+                    <option value="">Automática (melhor disponível)</option>
+                    {voices
+                      .slice()
+                      .sort((a, b) => {
+                        const aPt = a.lang.toLowerCase().startsWith("pt") ? 0 : 1;
+                        const bPt = b.lang.toLowerCase().startsWith("pt") ? 0 : 1;
+                        return aPt - bPt || a.name.localeCompare(b.name);
+                      })
+                      .map((v) => (
+                        <option key={v.voiceURI} value={v.voiceURI}>
+                          {v.name} ({v.lang}){v.localService === false ? " ☁️" : ""}
+                        </option>
+                      ))}
+                  </select>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs ${mutedText}`}>⌨️ Atalho iniciar/pausar tudo</span>
@@ -732,8 +820,11 @@ export default function TibiaTimer() {
           30:00 nesse reinício automático, mesmo que você tenha ajustado outro valor
           antes. Poção fixa em 10 min por vocação; amuleto e anel já vêm com o item
           correto (Plasma) e sua duração pode ser ajustada manualmente. O Timer Livre,
-          no fim da lista, é 100% livre — dê um nome e o tempo que quiser. Referência:
-          tibiawiki.com.br / tibia.fandom.com.
+          no fim da lista, é 100% livre — dê um nome e o tempo que quiser. O narrador usa
+          a melhor voz em português disponível no seu navegador (as marcadas com ☁️ são
+          vozes em nuvem, geralmente melhores que a voz padrão do sistema — Chrome e Edge
+          costumam ter as melhores opções, de graça, sem precisar instalar nada).
+          Referência: tibiawiki.com.br / tibia.fandom.com.
         </p>
       </div>
     </div>

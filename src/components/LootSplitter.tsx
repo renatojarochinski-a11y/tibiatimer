@@ -115,17 +115,17 @@ export default function LootSplitter() {
     });
   }
 
-  const bg = darkMode ? "bg-[#131210] text-[#d8d2b8]" : "bg-neutral-50 text-neutral-800";
+  const bg = darkMode ? "bg-[#0b0a09] text-[#d8d2b8]" : "bg-neutral-50 text-neutral-800";
   const mutedText = darkMode ? "text-[#a89f82]" : "text-neutral-500";
   const subtleBorder = darkMode ? "border-black" : "border-neutral-200";
   const inputCls = darkMode
-    ? "border-black/60 bg-[#1a1a17] text-[#e3ddc4] placeholder:text-[#75705c] focus:border-[#c9a227]"
+    ? "border-black/60 bg-[#1a1a17] text-[#e3ddc4] placeholder:text-[#75705c] focus:border-[#e2711d]"
     : "border-neutral-200 bg-white text-neutral-700 focus:border-rose-400";
   const btnGhost = darkMode
     ? "border-black/60 bg-[#333029] text-[#d8d2b8] hover:bg-[#3d3a30]"
     : "border-neutral-200 text-neutral-600 hover:bg-neutral-50";
   const btnPrimary = darkMode
-    ? "bg-[#5a1f1f] text-[#f3e3c0] hover:bg-[#6d2626]"
+    ? "bg-gradient-to-b from-[#f0932b] to-[#c9631a] text-[#20120a] hover:from-[#f7a13e] hover:to-[#d4701f] font-semibold"
     : "bg-rose-500 text-white hover:bg-rose-600";
 
   return (
@@ -133,16 +133,19 @@ export default function LootSplitter() {
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-3 py-4 sm:px-6 sm:py-8">
         <NavTabs dark={darkMode} />
         <header
-          className={`mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-dashed pb-4 ${subtleBorder}`}
+          className={`relative mb-5 flex flex-wrap items-center justify-between gap-3 pb-4 ${subtleBorder}`}
         >
+          {darkMode && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#e2711d] to-transparent" />
+          )}
           <div>
             <h1
-              className={`text-xl font-bold uppercase tracking-widest sm:text-2xl ${
-                darkMode ? "text-[#e3c168]" : "text-neutral-800"
+              className={`font-display text-2xl font-bold uppercase tracking-[0.15em] sm:text-3xl ${
+                darkMode ? "text-[#f0932b]" : "text-neutral-800"
               }`}
-              style={darkMode ? { textShadow: "0 0 12px rgba(227,193,104,0.35)" } : undefined}
+              style={darkMode ? { textShadow: "0 0 18px rgba(240,147,43,0.45)" } : undefined}
             >
-              💰 Loot Splitter
+              Loot Splitter
             </h1>
             <p className={`text-sm ${mutedText}`}>
               Cole o Party Hunt Analyser e veja quem deve pagar quem

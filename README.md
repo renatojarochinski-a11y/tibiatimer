@@ -16,12 +16,25 @@ Cronômetro de poções, anéis e amuletos do Tibia, por vocação.
     amuleto.
   - **Timer Livre** — objetivo (nome) e duração totalmente livres, pra
     qualquer outra coisa que você queira cronometrar.
-- Avisa com som, **narração por voz** (nos últimos 30 segundos) e
-  notificação do navegador, e reinicia sozinho até você pausar.
+- Avisa com som, **narração por voz** (em 1 minuto e em 30 segundos,
+  mais um apito nos 30s e ao zerar) e notificação do navegador, e
+  reinicia sozinho até você pausar — amuleto e anel sempre voltam para
+  30:00 nesse reinício automático.
+- O narrador escolhe automaticamente a **melhor voz em português
+  disponível no navegador** (dá pra trocar manualmente também) —
+  Chrome e Edge costumam ter vozes em nuvem de qualidade bem melhor que
+  a voz padrão do sistema, de graça, sem precisar de nenhum serviço
+  externo.
 - **Atalho de teclado** configurável para iniciar/pausar todos os
   cronômetros de uma vez.
-- **Modo escuro** (padrão), com visual inspirado nos painéis laterais do
-  HUD do Tibia.
+- Segunda aba, **Loot Splitter** (`/loot`): cola o texto do "Party Hunt
+  Analyser" do jogo e calcula quem deve pagar quem pra todo mundo
+  sair com o mesmo lucro — réplica da lógica do
+  [tibiamaps.io/tools/loot](https://tibiamaps.io/tools/loot).
+- **Modo escuro** (padrão): painéis com a cara do HUD do Tibia (barra de
+  título escura, bordas finas, botão de recolher) sobre um visual mais
+  "site oficial" — fundo escuro, laranja de marca e fonte de destaque,
+  inspirado em [tibia.com](https://www.tibia.com/news/?subtopic=latestnews).
 - Não precisa de login nem banco de dados — tudo roda no navegador
   (localStorage guarda suas preferências).
 

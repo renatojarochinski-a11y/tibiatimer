@@ -22,7 +22,7 @@ export default function NavTabs({ dark }: { dark: boolean }) {
             className={`rounded-[3px] border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
               active
                 ? dark
-                  ? "border-[#c9a227] bg-[#c9a227] text-[#1c140c]"
+                  ? "border-[#e2711d] bg-[#e2711d] text-[#20120a]"
                   : "border-rose-500 bg-rose-500 text-white"
                 : dark
                   ? "border-black/60 bg-[#333029] text-[#d8d2b8] hover:bg-[#3d3a30]"
